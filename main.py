@@ -1,156 +1,293 @@
+"""
+Air-Typing - Clavier Virtuel Contrôlé par Gestes
+Version améliorée avec architecture modulaire
+
+Auteur: machideau
+GitHub: https://github.com/machideau/air-typing
+"""
+
 import cv2
-import mediapipe as mp
 import pygame
-import math
 import numpy as np
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
+import time
+import os
+from datetime import datetime
 
-# Initialize MediaPipe Tasks
-BaseOptions = mp.tasks.BaseOptions
-HandLandmarker = mp.tasks.vision.HandLandmarker
-HandLandmarkerOptions = mp.tasks.vision.HandLandmarkerOptions
-VisionRunningMode = mp.tasks.vision.RunningMode
+# Imports des modules personnalisés
+import config
+from utils import (
+    HandDetector,
+    VirtualKeyboard,
+    TextBox,
+    StatusBar,
+    Cursor,
+    ParticleSystem,
+    AudioManager
+)
 
-# Create a hand landmarker instance with the video mode:
-options = HandLandmarkerOptions(
-    base_options=BaseOptions(model_asset_path='hand_landmarker.task'),
-    running_mode=VisionRunningMode.VIDEO,
-    num_hands=2,
-    min_hand_detection_confidence=0.5,
-    min_hand_presence_confidence=0.5,
-    min_tracking_confidence=0.5)
-landmarker = HandLandmarker.create_from_options(options)
 
-# Initialize Pygame
-pygame.init()
-WIDTH, HEIGHT = 1280, 720
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-font = pygame.font.Font(None, 50)
-big_font = pygame.font.Font(None, 80)
-
-# Keyboard Layout (Added Backspace and Space)
-keys = [["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "<-"],
-        ["A", "S", "D", "F", "G", "H", "J", "K", "L", ";"],
-        ["Z", "X", "C", "V", "B", "N", "M", ",", ".", " "]]
-
-typed_text = ""
-
-class Key():
-    def __init__(self, x, y, char, w=80, h=80):
-        self.x = x
-        self.y = y
-        self.char = char
-        self.w = w
-        self.h = h
-
-    def draw(self, screen, is_hovered=False, is_pressed=False):
-        # Color Logic: Cyan for hover, White for normal, Pink for click
-        color = (200, 200, 200)
-        thickness = 2
-        if is_hovered: 
-            color = (0, 255, 255)
-            thickness = 4
-        if is_pressed: 
-            color = (255, 0, 255)
-            thickness = 6
+class AirTypingApp:
+    """Application principale Air-Typing"""
+    
+    def __init__(self):
+        """Initialise l'application"""
+        # Initialiser Pygame
+        pygame.init()
         
-        # Draw soft rounded corners
-        pygame.draw.rect(screen, color, (self.x, self.y, self.w, self.h), thickness, border_radius=12)
+        # Créer la fenêtre
+        self.screen = pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
+        pygame.display.set_caption("Air-Typing - Clavier Virtuel par Gestes")
         
-        # Center the text
-        label = "BS" if self.char == "<-" else "SPACE" if self.char == " " else self.char
-        text_surface = font.render(label, True, color)
-        text_rect = text_surface.get_rect(center=(self.x + self.w//2, self.y + self.h//2))
-        screen.blit(text_surface, text_rect)
-
-# Generate Key Objects
-keyboard_objs = []
-for i, row in enumerate(keys):
-    for j, char in enumerate(row):
-        w = 200 if char == " " else 100 if char == "<-" else 80
-        keyboard_objs.append(Key(110 * j + 100, 110 * i + 250, char, w=w))
-
-cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, WIDTH)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, HEIGHT)
-
-running = True
-last_char = ""
-
-while running:
-    ret, frame = cap.read()
-    if not ret: break
+        # Charger les polices
+        self.font_normal = pygame.font.Font(None, config.FONT_SIZE_NORMAL)
+        self.font_big = pygame.font.Font(None, config.FONT_SIZE_BIG)
+        self.font_small = pygame.font.Font(None, config.FONT_SIZE_SMALL)
+        
+        # Initialiser les composants
+        self.hand_detector = HandDetector()
+        self.keyboard = VirtualKeyboard()
+        self.text_box = TextBox()
+        self.status_bar = StatusBar()
+        self.cursor = Cursor()
+        self.particle_system = ParticleSystem()
+        self.audio_manager = AudioManager()
+        
+        # Initialiser la webcam
+        self.cap = cv2.VideoCapture(config.CAMERA_INDEX)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.WINDOW_WIDTH)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.WINDOW_HEIGHT)
+        
+        # État de l'application
+        self.running = True
+        self.current_theme_name = config.DEFAULT_THEME
+        self.current_theme = config.THEMES[self.current_theme_name]
+        self.show_menu = False
+        
+        # FPS
+        self.clock = pygame.time.Clock()
+        self.fps = 0
+        
+        # Sauvegarde automatique
+        self.last_save_time = time.time()
+        
+        # Charger le texte sauvegardé si existant
+        self._load_saved_text()
     
-    frame = cv2.flip(frame, 1)
-    img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    def _load_saved_text(self):
+        """Charge le texte sauvegardé précédemment"""
+        if os.path.exists(config.SAVE_FILE):
+            try:
+                with open(config.SAVE_FILE, 'r', encoding='utf-8') as f:
+                    saved_text = f.read()
+                    self.keyboard.set_text(saved_text)
+                    print(f"Texte chargé depuis {config.SAVE_FILE}")
+            except Exception as e:
+                print(f"Erreur lors du chargement du texte: {e}")
     
-    # Convert to MediaPipe Image
-    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
+    def _save_text(self):
+        """Sauvegarde le texte actuel"""
+        try:
+            with open(config.SAVE_FILE, 'w', encoding='utf-8') as f:
+                f.write(self.keyboard.get_text())
+            print(f"Texte sauvegardé dans {config.SAVE_FILE}")
+        except Exception as e:
+            print(f"Erreur lors de la sauvegarde du texte: {e}")
     
-    # Get timestamp in ms
-    timestamp_ms = pygame.time.get_ticks()
+    def _auto_save(self):
+        """Sauvegarde automatique périodique"""
+        if not config.AUTO_SAVE:
+            return
+        
+        current_time = time.time()
+        if current_time - self.last_save_time >= config.SAVE_INTERVAL:
+            self._save_text()
+            self.last_save_time = current_time
     
-    # Process
-    results = landmarker.detect_for_video(mp_image, timestamp_ms)
-
-    # Convert OpenCV frame to Pygame Surface (The Background)
-    # This (cv2.transpose) works because Pygame uses (width, height) but numpy image is (height, width, channels)
-    # And we need to swap axis for surfarray.make_surface which expects (width, height, channels)
-    frame_surface = pygame.surfarray.make_surface(cv2.transpose(img_rgb))
-    screen.blit(frame_surface, (0, 0))
-
-    cursor_pos = None
-    clicking = False
-
-    if results.hand_landmarks:
-        for hand_lms in results.hand_landmarks:
-            # hand_lms is a list of NormalizedLandmark objects
-            # Index 8 is Index Finger Tip, 4 is Thumb Tip
+    def _cycle_theme(self):
+        """Passe au thème suivant"""
+        theme_names = list(config.THEMES.keys())
+        current_index = theme_names.index(self.current_theme_name)
+        next_index = (current_index + 1) % len(theme_names)
+        self.current_theme_name = theme_names[next_index]
+        self.current_theme = config.THEMES[self.current_theme_name]
+        print(f"Thème changé: {self.current_theme['name']}")
+    
+    def _handle_events(self):
+        """Gère les événements Pygame"""
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
             
-            idx_x = int(hand_lms[8].x * WIDTH)
-            idx_y = int(hand_lms[8].y * HEIGHT)
-            cursor_pos = (idx_x, idx_y)
-
-            thumb_x = int(hand_lms[4].x * WIDTH)
-            thumb_y = int(hand_lms[4].y * HEIGHT)
-            distance = math.hypot(idx_x - thumb_x, idx_y - thumb_y)
-            
-            if distance < 35: 
-                clicking = True
-
-            # Draw a futuristic "target" cursor
-            pygame.draw.circle(screen, (0, 255, 255), (idx_x, idx_y), 20, 2)
-            pygame.draw.circle(screen, (0, 255, 255), (idx_x, idx_y), 2)
-
-    # Keyboard Logic
-    for key in keyboard_objs:
-        hover = False
-        if cursor_pos:
-            if key.x < cursor_pos[0] < key.x + key.w and key.y < cursor_pos[1] < key.y + key.h:
-                hover = True
-                if clicking and last_char != key.char:
-                    if key.char == "<-":
-                        typed_text = typed_text[:-1] # Backspace logic
-                    else:
-                        typed_text += key.char
-                    last_char = key.char 
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    # Menu ou quitter
+                    self.running = False
                 
-        if not clicking:
-            last_char = ""
+                elif event.key == pygame.K_t:
+                    # Changer de thème
+                    self._cycle_theme()
+                
+                elif event.key == pygame.K_s:
+                    # Sauvegarder manuellement
+                    self._save_text()
+                
+                elif event.key == pygame.K_c:
+                    # Effacer le texte
+                    self.keyboard.clear_text()
+                
+                elif event.key == pygame.K_m:
+                    # Toggle son
+                    enabled = self.audio_manager.toggle()
+                    print(f"Son: {'Activé' if enabled else 'Désactivé'}")
+                
+                elif event.key == pygame.K_l:
+                    # Changer de layout
+                    current_layout = self.keyboard.layout_name
+                    new_layout = 'AZERTY' if current_layout == 'QWERTY' else 'QWERTY'
+                    self.keyboard.change_layout(new_layout)
+                    print(f"Layout changé: {new_layout}")
+    
+    def _process_frame(self):
+        """Traite une frame de la webcam"""
+        ret, frame = self.cap.read()
+        if not ret:
+            return None
+        
+        # Miroir et conversion
+        frame = cv2.flip(frame, 1)
+        img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        
+        return img_rgb
+    
+    def _draw_background(self, frame_rgb):
+        """Dessine le fond (webcam)"""
+        # Convertir la frame en surface Pygame
+        frame_surface = pygame.surfarray.make_surface(cv2.transpose(frame_rgb))
+        self.screen.blit(frame_surface, (0, 0))
+        
+        # Overlay semi-transparent pour améliorer la lisibilité
+        overlay = pygame.Surface((config.WINDOW_WIDTH, config.WINDOW_HEIGHT), pygame.SRCALPHA)
+        overlay.fill(self.current_theme['background'] + (50,))
+        self.screen.blit(overlay, (0, 0))
+    
+    def run(self):
+        """Boucle principale de l'application"""
+        print("=== Air-Typing démarré ===")
+        print("Contrôles:")
+        print("  ESC: Quitter")
+        print("  T: Changer de thème")
+        print("  S: Sauvegarder le texte")
+        print("  C: Effacer le texte")
+        print("  M: Activer/Désactiver le son")
+        print("  L: Changer de layout (QWERTY/AZERTY)")
+        print("========================\n")
+        
+        while self.running:
+            # Gérer les événements
+            self._handle_events()
+            
+            # Traiter la frame
+            frame_rgb = self._process_frame()
+            if frame_rgb is None:
+                break
+            
+            # Détecter les mains
+            timestamp_ms = pygame.time.get_ticks()
+            cursor_pos, clicking, landmarks = self.hand_detector.detect(frame_rgb, timestamp_ms)
+            
+            # Dessiner le fond
+            self._draw_background(frame_rgb)
+            
+            # Mettre à jour le clavier
+            typed_char = self.keyboard.update(cursor_pos, clicking)
+            
+            # Jouer le son si une touche a été tapée
+            if typed_char:
+                self.audio_manager.play_key_sound(typed_char)
+                # Émettre des particules
+                if cursor_pos:
+                    self.particle_system.emit(
+                        cursor_pos[0],
+                        cursor_pos[1],
+                        self.current_theme['particle']
+                    )
+            
+            # Dessiner le clavier
+            self.keyboard.draw(self.screen, self.current_theme, self.font_normal)
+            
+            # Dessiner la zone de texte
+            self.text_box.draw(
+                self.screen,
+                self.keyboard.get_text(),
+                self.current_theme,
+                self.font_big
+            )
+            
+            # Dessiner le curseur
+            if cursor_pos:
+                self.cursor.update()
+                self.cursor.draw(self.screen, cursor_pos, self.current_theme, clicking)
+            
+            # Mettre à jour et dessiner les particules
+            self.particle_system.update()
+            self.particle_system.draw(self.screen)
+            
+            # Dessiner la barre d'état
+            self.status_bar.update(self.fps, self.current_theme['name'])
+            self.status_bar.draw(self.screen, self.current_theme, self.font_small)
+            
+            # Dessiner les landmarks si debug activé
+            if config.SHOW_HAND_LANDMARKS and landmarks:
+                self._draw_landmarks(landmarks)
+            
+            # Mettre à jour l'affichage
+            pygame.display.flip()
+            
+            # Contrôler le FPS
+            self.clock.tick(config.TARGET_FPS)
+            self.fps = self.clock.get_fps()
+            
+            # Sauvegarde automatique
+            self._auto_save()
+        
+        # Nettoyage
+        self.cleanup()
+    
+    def _draw_landmarks(self, landmarks_list):
+        """Dessine les landmarks des mains pour le debug"""
+        for hand_landmarks in landmarks_list:
+            for landmark in hand_landmarks:
+                x = int(landmark.x * config.WINDOW_WIDTH)
+                y = int(landmark.y * config.WINDOW_HEIGHT)
+                pygame.draw.circle(self.screen, (0, 255, 0), (x, y), 3)
+    
+    def cleanup(self):
+        """Nettoie les ressources"""
+        print("\n=== Fermeture de l'application ===")
+        
+        # Sauvegarder le texte
+        self._save_text()
+        
+        # Libérer les ressources
+        self.cap.release()
+        self.hand_detector.close()
+        pygame.quit()
+        
+        print("Application fermée proprement.")
 
-        key.draw(screen, is_hovered=hover, is_pressed=(hover and clicking))
 
-    # Glassy Text Box Overlay
-    pygame.draw.rect(screen, (0, 0, 0), (100, 50, 1080, 100), border_radius=15)
-    pygame.draw.rect(screen, (0, 255, 255), (100, 50, 1080, 100), 2, border_radius=15)
-    result_surface = big_font.render(typed_text, True, (255, 255, 255))
-    screen.blit(result_surface, (130, 70))
+def main():
+    """Point d'entrée de l'application"""
+    try:
+        app = AirTypingApp()
+        app.run()
+    except KeyboardInterrupt:
+        print("\nInterruption par l'utilisateur")
+    except Exception as e:
+        print(f"\nErreur fatale: {e}")
+        import traceback
+        traceback.print_exc()
 
-    pygame.display.update()
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
 
-cap.release()
-pygame.quit()
+if __name__ == "__main__":
+    main()

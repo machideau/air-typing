@@ -1,157 +1,225 @@
 # ⌨️ Air-Typing - Clavier Virtuel Contrôlé par Gestes
 
-Un clavier virtuel futuriste contrôlé par gestes, construit avec **Computer Vision**. Ce projet permet de taper dans les airs en suivant les mouvements de la main et les "clics" des doigts (gestes de pincement) à l'aide d'une webcam.
+Un clavier virtuel futuriste et moderne contrôlé par gestes de la main, construit avec **Computer Vision** et **Intelligence Artificielle**. Tapez dans les airs en utilisant simplement vos mains et une webcam !
 
+![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
+![MediaPipe](https://img.shields.io/badge/MediaPipe-0.10.14-green.svg)
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+
+---
 
 ## ✨ Fonctionnalités
 
-* **Suivi des Mains en Temps Réel** : Utilise MediaPipe pour suivre 21 points de repère de la main à haute fréquence
-* **Reconnaissance de Gestes** : Détection intelligente du "pincement" en calculant la distance euclidienne entre l'index et le pouce
-* **Interface Holographique** : Overlay Pygame semi-transparent créant un effet de Réalité Augmentée (AR)
-* **Clavier Complet** : Inclut A-Z, barre d'espace, et système de suppression (Backspace) fonctionnel
-* **Retour Visuel Dynamique** : Changement de couleur (Cyan au survol, Magenta au clic) pour un feedback UX immersif
+### 🎯 Détection Avancée
+* **Suivi des Mains en Temps Réel** : Utilise MediaPipe pour suivre 21 points de repère de la main avec une précision exceptionnelle
+* **Reconnaissance de Gestes Intelligente** : Détection du "pincement" (index + pouce) avec lissage pour une stabilité optimale
+* **Support Multi-Mains** : Détecte jusqu'à 2 mains simultanément
+
+### 🎨 Interface Moderne
+* **4 Thèmes Visuels** : Sombre, Clair, Néon et Minimaliste
+* **Animations Fluides** : Effets de pression, particules et transitions douces
+* **Design Glassmorphism** : Interface semi-transparente avec effet de verre dépoli
+* **Curseur Animé** : Curseur futuriste avec pulsation et croix de visée
+
+### 🔊 Feedback Multi-Sensoriel
+* **Sons Synthétiques** : Feedback audio pour chaque touche (bips personnalisés)
+* **Effets Visuels** : Système de particules lors des clics
+* **Retour Haptique Visuel** : Changement de couleur dynamique (Cyan → Magenta)
+
+### ⚙️ Fonctionnalités Avancées
+* **Sauvegarde Automatique** : Le texte est sauvegardé toutes les 30 secondes
+* **Layouts Multiples** : Support QWERTY et AZERTY
+* **Architecture Modulaire** : Code propre et maintenable
+* **Barre d'État** : Affichage du FPS, thème actuel et raccourcis
 
 ---
 
-## 🚀 Technologies Utilisées
-
-| Technologie | Version | Utilisation |
-|------------|---------|-------------|
-| **Python** | 3.12 ou 3.11 | Langage principal |
-| **OpenCV** | 4.10.0.84 | Traitement d'image et capture webcam |
-| **MediaPipe** | 0.10.14 | Détection et suivi des points de la main |
-| **Pygame-CE** | Latest | Interface graphique et rendu |
-| **NumPy** | Latest | Calculs matriciels |
-| **Protobuf** | <5.0.0 | Sérialisation des données MediaPipe |
-
----
-
-## 📦 Installation et Configuration
+## 🚀 Installation Rapide
 
 ### Prérequis
-
-- **Python 3.11** ou supérieur
+- **Python 3.11+** ([Télécharger](https://www.python.org/downloads/))
 - **Webcam** fonctionnelle
-- **Windows** (testé sur Windows, adaptable pour Mac/Linux)
-- **Fichier modèle MediaPipe** : `hand_landmarker.task` (doit être dans le même dossier que `main.py`)
+- **Windows / Mac / Linux**
 
-### Étapes d'Installation
+### Installation en 3 Étapes
 
 #### 1️⃣ Cloner le dépôt
-
 ```bash
 git clone https://github.com/machideau/air-typing.git
 cd air-typing
 ```
 
-#### 2️⃣ Créer un environnement virtuel (Recommandé)
-
-**Windows :**
+#### 2️⃣ Installer les dépendances
 ```bash
-py -3.11 -m venv env
+# Créer un environnement virtuel (recommandé)
+python -m venv env
+
+# Activer l'environnement
+# Windows:
 env\Scripts\activate
+# Mac/Linux:
+source env/bin/activate
+
+# Installer les packages
+pip install -r requirements.txt
 ```
 
-**Mac/Linux :**
-python3.11 -m venv env
-pip install -r modules.txt
-
-🔗 [MediaPipe Hand Landmarker Model](https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task)
-
-Placez-le dans le dossier `air-typing/` à côté de `main.py`.
+#### 3️⃣ Télécharger le modèle MediaPipe
+Le fichier `hand_landmarker.task` est déjà inclus dans le dépôt. Si absent :
+- 🔗 [Télécharger hand_landmarker.task](https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task)
+- Placez-le dans le dossier `air-typing/`
 
 ---
 
 ## 🎮 Utilisation
 
 ### Lancer l'Application
-
 ```bash
 python main.py
 ```
 
-### Comment Utiliser le Clavier Virtuel
+### Contrôles Gestuels
 
-1. **Positionnement** : Placez votre main devant la webcam, paume visible
-2. **Déplacer le Curseur** : Utilisez la pointe de votre **index** comme curseur pour survoler les touches
-3. **Taper une Lettre** : Rapprochez votre **pouce** et votre **index** (geste de pincement) pour "cliquer" sur une touche
-4. **Effacer** : Utilisez la touche **BS** (Backspace) en haut à droite pour supprimer des caractères
-5. **Espace** : La touche **SPACE** en bas permet d'ajouter des espaces
+| Geste | Action |
+|-------|--------|
+| 👆 **Index levé** | Déplacer le curseur |
+| 🤏 **Pincement** (Index + Pouce) | Cliquer sur une touche |
+| ✋ **Main visible** | Activer le clavier |
+
+### Raccourcis Clavier
+
+| Touche | Action |
+|--------|--------|
+| `ESC` | Quitter l'application |
+| `T` | Changer de thème (Sombre → Clair → Néon → Minimaliste) |
+| `S` | Sauvegarder le texte manuellement |
+| `C` | Effacer tout le texte |
+| `M` | Activer/Désactiver le son |
+| `L` | Changer de layout (QWERTY ↔ AZERTY) |
 
 ### Indicateurs Visuels
 
-- **Cercle Cyan** : Curseur de votre index
-- **Contour Cyan** : Touche survolée
-- **Contour Magenta** : Touche cliquée
-- **Zone de Texte** : Affiche le texte tapé en temps réel
+- 🔵 **Contour Cyan** : Touche survolée
+- 🟣 **Contour Magenta** : Touche pressée
+- ⭕ **Cercle Cyan** : Position du curseur (index)
+- ✨ **Particules** : Effet lors des clics
 
 ---
 
-## 🛠 Structure du Projet
+## 📁 Structure du Projet
 
 ```
 air-typing/
-├── main.py                  # Application principale (boucle Pygame + logique MediaPipe)
-├── hand_landmarker.task     # Modèle MediaPipe pour la détection des mains
-├── requirements.txt         # Dépendances Python
-├── .gitignore              # Fichiers à ignorer par Git
-├── README.md               # Ce fichier
-└── debug_*.py              # Scripts de débogage (optionnels)
+├── main.py                    # Application principale
+├── config.py                  # Configuration centralisée
+├── utils/                     # Modules utilitaires
+│   ├── __init__.py
+│   ├── hand_detector.py       # Détection des mains (MediaPipe)
+│   ├── keyboard.py            # Clavier virtuel
+│   ├── ui_components.py       # Composants UI (TextBox, Cursor, etc.)
+│   └── audio_manager.py       # Gestionnaire audio
+├── hand_landmarker.task       # Modèle MediaPipe
+├── requirements.txt           # Dépendances Python
+├── typed_text.txt            # Texte sauvegardé (généré automatiquement)
+├── .gitignore
+└── README.md
 ```
+
+---
+
+## ⚙️ Configuration
+
+Tous les paramètres sont modifiables dans `config.py` :
+
+### Paramètres Principaux
+```python
+# Webcam
+CAMERA_INDEX = 0              # Index de la caméra
+WINDOW_WIDTH = 1280           # Largeur de la fenêtre
+WINDOW_HEIGHT = 720           # Hauteur de la fenêtre
+
+# Détection
+PINCH_THRESHOLD = 35          # Sensibilité du pincement (pixels)
+HOVER_SMOOTHING = 0.7         # Lissage du curseur (0-1)
+
+# Audio
+ENABLE_SOUND = True           # Activer/désactiver le son
+SOUND_VOLUME = 0.5            # Volume (0.0 - 1.0)
+
+# Sauvegarde
+AUTO_SAVE = True              # Sauvegarde automatique
+SAVE_INTERVAL = 30            # Intervalle en secondes
+```
+
+---
+
+## 🎨 Thèmes Disponibles
+
+### 🌑 Sombre (Défaut)
+Interface cyberpunk avec accents cyan et magenta sur fond noir
+
+### ☀️ Clair
+Design épuré avec accents bleu et violet sur fond blanc
+
+### 💜 Néon
+Style futuriste avec couleurs vives et effet glow
+
+### ⚪ Minimaliste
+Design ultra-épuré en noir et blanc
 
 ---
 
 ## 🐛 Dépannage
 
-### Problème : `ImportError: DLL load failed while importing _framework_bindings`
-
-**Solution :**
+### ❌ Erreur : `ImportError: DLL load failed`
 ```bash
 pip uninstall mediapipe
 pip install mediapipe==0.10.14
 ```
 
-### Problème : La webcam ne s'ouvre pas
+### ❌ La webcam ne s'ouvre pas
+- Vérifiez que votre webcam est connectée
+- Essayez de changer `CAMERA_INDEX` dans `config.py` (0, 1, 2...)
+- Fermez les autres applications utilisant la webcam
 
-**Solution :**
-- Vérifiez que votre webcam est connectée et fonctionnelle
-- Essayez de changer l'index de la caméra dans `main.py` :
-  ```python
-  cap = cv2.VideoCapture(1)  # Essayez 0, 1, 2...
-  ```
-
-### Problème : `FileNotFoundError: hand_landmarker.task`
-
-**Solution :**
-- Téléchargez le modèle depuis le lien ci-dessus
-- Placez-le dans le même dossier que `main.py`
-
-### Problème : Détection des gestes imprécise
-
-**Solution :**
+### ❌ Détection imprécise
 - Améliorez l'éclairage de votre environnement
-- Ajustez la distance entre votre main et la webcam
-- Modifiez le seuil de détection dans `main.py` (ligne 119) :
-  ```python
-  if distance < 40:  # Augmentez ou diminuez cette valeur
-  ```
+- Ajustez `PINCH_THRESHOLD` dans `config.py`
+- Réduisez `HOVER_SMOOTHING` pour plus de réactivité
+
+### ❌ Pas de son
+- Vérifiez que `ENABLE_SOUND = True` dans `config.py`
+- Installez `numpy` : `pip install numpy`
+- Appuyez sur `M` pour activer le son
+
+---
+
+## 🔧 Technologies Utilisées
+
+| Technologie | Version | Rôle |
+|------------|---------|------|
+| **Python** | 3.11+ | Langage principal |
+| **OpenCV** | 4.10.0.84 | Capture webcam et traitement d'image |
+| **MediaPipe** | 0.10.14 | Détection et tracking des mains |
+| **Pygame-CE** | Latest | Interface graphique et rendu |
+| **NumPy** | Latest | Calculs matriciels et génération audio |
 
 ---
 
 ## 📝 Améliorations Futures
 
-- [ ] Ajout de sons de clic pour le feedback audio
-- [ ] Support de plusieurs langues (AZERTY, QWERTZ)
-- [ ] Mode sombre / clair
-- [ ] Enregistrement automatique du texte tapé
-- [ ] Détection de gestes supplémentaires (swipe pour effacer tout, etc.)
-- [ ] Optimisation des performances pour des FPS plus élevés
+- [ ] Support de gestes supplémentaires (swipe, zoom)
+- [ ] Mode d'entraînement pour améliorer la précision
+- [ ] Export du texte en différents formats (PDF, DOCX)
+- [ ] Support de la dictée vocale combinée
+- [ ] Mode multi-utilisateurs
+- [ ] Application mobile (iOS/Android)
 
 ---
 
 ## 📄 Licence
 
-Ce projet est open source. Libre d'utilisation pour des projets personnels et éducatifs.
+Ce projet est sous licence MIT. Libre d'utilisation pour des projets personnels et commerciaux.
 
 ---
 
@@ -165,10 +233,23 @@ Ce projet est open source. Libre d'utilisation pour des projets personnels et é
 
 ## 🙏 Remerciements
 
-- **MediaPipe** par Google pour la technologie de suivi des mains
-- **OpenCV** pour le traitement d'image
-- **Pygame Community Edition** pour le rendu graphique
+- **Google MediaPipe** pour la technologie de détection des mains
+- **OpenCV** pour le traitement d'image en temps réel
+- **Pygame Community Edition** pour le rendu graphique performant
+
+---
+
+## 🌟 Contribuer
+
+Les contributions sont les bienvenues ! N'hésitez pas à :
+1. Fork le projet
+2. Créer une branche (`git checkout -b feature/AmazingFeature`)
+3. Commit vos changements (`git commit -m 'Add AmazingFeature'`)
+4. Push vers la branche (`git push origin feature/AmazingFeature`)
+5. Ouvrir une Pull Request
 
 ---
 
 **⭐ Si ce projet vous plaît, n'hésitez pas à lui donner une étoile sur GitHub !**
+
+**🎥 [Voir la Démo Vidéo](#)** | **📸 [Captures d'Écran](#)**
