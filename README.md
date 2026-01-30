@@ -17,7 +17,7 @@ Un clavier virtuel futuriste contrôlé par gestes, construit avec **Computer Vi
 
 | Technologie | Version | Utilisation |
 |------------|---------|-------------|
-| **Python** | 3.11+ | Langage principal |
+| **Python** | 3.12 ou 3.11 | Langage principal |
 | **OpenCV** | 4.10.0.84 | Traitement d'image et capture webcam |
 | **MediaPipe** | 0.10.14 | Détection et suivi des points de la main |
 | **Pygame-CE** | Latest | Interface graphique et rendu |
@@ -53,25 +53,8 @@ env\Scripts\activate
 ```
 
 **Mac/Linux :**
-```bash
 python3.11 -m venv env
-source env/bin/activate
-```
-
-#### 3️⃣ Installer les dépendances
-
-```bash
-pip install -r requirements.txt
-```
-
-**Ou manuellement :**
-```bash
-pip install opencv-python==4.10.0.84 mediapipe==0.10.14 numpy protobuf<5.0.0 pygame-ce pygame msvc-runtime
-```
-
-#### 4️⃣ Télécharger le modèle MediaPipe
-
-Le fichier `hand_landmarker.task` doit être présent dans le répertoire racine du projet. Si vous ne l'avez pas, téléchargez-le depuis :
+pip install -r modules.txt
 
 🔗 [MediaPipe Hand Landmarker Model](https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task)
 
