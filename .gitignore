@@ -1,0 +1,29 @@
+# --- Python Environments ---
+.venv/
+venv/
+env/
+bin/
+lib/
+include/
+
+# --- Python Cache & Compiled Files ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# --- IDE & Editor Settings ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- System Files ---
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# --- MediaPipe/OpenCV Logs & Temp ---
+*.log
+mediapipe_logs/
