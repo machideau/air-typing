@@ -64,12 +64,17 @@ class Key:
         else:
             self.press_animation = max(0.0, self.press_animation - 0.15)
         
-        # Retourne True si la touche vient d'être relâchée (clic complet)
-        return was_pressed and not self.is_pressed and self.is_hovered
+        
+        # Retourne True si la touche vient d'être pressée (changement d'état)
+        # Simplifié: on déclenche dès qu'on appuie, pas besoin d'attendre le relâchement
+        result = not was_pressed and self.is_pressed and self.is_hovered
+        if result:
+            print(f"DEBUG Key '{self.char}': TRIGGERED!")
+        return result
     
     def draw(self, screen: pygame.Surface, theme: dict, font: pygame.font.Font):
         """
-        Dessine la touche
+        Dessine la touche avec effet glassmorphism
         
         Args:
             screen: Surface Pygame
@@ -96,17 +101,55 @@ class Key:
             self.h - offset * 2
         )
         
-        # Dessiner le fond si pressé (effet de remplissage)
-        if self.press_animation > 0:
-            fill_color = tuple(int(c * 0.3) for c in color)
+        # Ombre portée (si pressé ou survolé)
+        if self.is_hovered or self.is_pressed:
+            shadow_offset = 3 if self.is_pressed else 5
+            shadow_rect = (
+                draw_rect[0] + shadow_offset,
+                draw_rect[1] + shadow_offset,
+                draw_rect[2],
+                draw_rect[3]
+            )
+            shadow_surface = pygame.Surface((draw_rect[2], draw_rect[3]), pygame.SRCALPHA)
+            shadow_color = (0, 0, 0, 80)
             pygame.draw.rect(
-                screen,
-                fill_color,
-                draw_rect,
+                shadow_surface,
+                shadow_color,
+                (0, 0, draw_rect[2], draw_rect[3]),
                 border_radius=config.KEY_BORDER_RADIUS
             )
+            screen.blit(shadow_surface, (shadow_rect[0], shadow_rect[1]))
         
-        # Dessiner le contour
+        # Fond glassmorphism (semi-transparent)
+        if self.press_animation > 0 or self.is_hovered:
+            alpha = int(100 + (self.press_animation * 100))
+            # Handle RGBA colors by taking only the first 3 components (RGB)
+            rgb = color[:3]
+            fill_color = tuple(int(c * 0.4) for c in rgb) + (alpha,)
+            glass_surface = pygame.Surface((draw_rect[2], draw_rect[3]), pygame.SRCALPHA)
+            pygame.draw.rect(
+                glass_surface,
+                fill_color,
+                (0, 0, draw_rect[2], draw_rect[3]),
+                border_radius=config.KEY_BORDER_RADIUS
+            )
+            screen.blit(glass_surface, (draw_rect[0], draw_rect[1]))
+        
+        # Dessiner le contour avec glow si survolé
+        if self.is_hovered:
+            # Glow externe
+            glow_surface = pygame.Surface((draw_rect[2] + 10, draw_rect[3] + 10), pygame.SRCALPHA)
+            # Handle RGBA by taking RGB parts and adding fixed alpha
+            glow_color = color[:3] + (50,)
+            pygame.draw.rect(
+                glow_surface,
+                glow_color,
+                (0, 0, draw_rect[2] + 10, draw_rect[3] + 10),
+                border_radius=config.KEY_BORDER_RADIUS + 2
+            )
+            screen.blit(glow_surface, (draw_rect[0] - 5, draw_rect[1] - 5))
+        
+        # Contour principal
         pygame.draw.rect(
             screen,
             color,
@@ -115,8 +158,17 @@ class Key:
             border_radius=config.KEY_BORDER_RADIUS
         )
         
-        # Dessiner le texte
+        # Dessiner le texte avec ombre
         label = self._get_label()
+        
+        # Ombre du texte
+        text_shadow = font.render(label, True, (0, 0, 0))
+        shadow_rect = text_shadow.get_rect(
+            center=(self.x + self.w // 2 + 2, self.y + self.h // 2 + 2)
+        )
+        screen.blit(text_shadow, shadow_rect)
+        
+        # Texte principal
         text_surface = font.render(label, True, color)
         text_rect = text_surface.get_rect(
             center=(self.x + self.w // 2, self.y + self.h // 2)
@@ -129,6 +181,10 @@ class Key:
             return "BS"
         elif self.char == " ":
             return "SPACE"
+        elif self.char == "SHIFT":
+            return "⇧"
+        elif self.char == "ENTER":
+            return "↵"
         else:
             return self.char
 
@@ -149,6 +205,8 @@ class VirtualKeyboard:
         # Tracking séparé pour chaque main
         self.last_clicked_char_left = ""
         self.last_clicked_char_right = ""
+        # État du Shift
+        self.shift_active = False
         
         # Créer les touches
         self._create_keys()
@@ -167,6 +225,10 @@ class VirtualKeyboard:
                     w = config.SPACE_KEY_WIDTH
                 elif char == "<-":
                     w = config.BACKSPACE_KEY_WIDTH
+                elif char == "SHIFT":
+                    w = config.SHIFT_KEY_WIDTH
+                elif char == "ENTER":
+                    w = config.ENTER_KEY_WIDTH
                 else:
                     w = config.KEY_WIDTH
                 
@@ -244,16 +306,58 @@ class VirtualKeyboard:
         Returns:
             Caractère tapé ou None
         """
-        if key.char == "<-":
+        # Gestion des touches spéciales
+        if key.char == "SHIFT":
+            # Toggle shift
+            self.shift_active = not self.shift_active
+            return None
+        elif key.char == "ENTER":
+            # Nouvelle ligne
+            self.typed_text += "\n"
+            return "\n"
+        elif key.char == "<-":
             # Backspace
             if self.typed_text:
                 self.typed_text = self.typed_text[:-1]
                 return "<-"
         else:
-            # Caractère normal
-            self.typed_text += key.char
-            return key.char
+            # Caractère normal - appliquer shift si actif
+            char = key.char
+            if self.shift_active:
+                char = self._apply_shift(char)
+                # Désactiver shift après utilisation (comportement standard)
+                self.shift_active = False
+            
+            self.typed_text += char
+            return char
         return None
+    
+    def _apply_shift(self, char: str) -> str:
+        """
+        Applique la transformation Shift à un caractère
+        
+        Args:
+            char: Caractère à transformer
+            
+        Returns:
+            Caractère transformé
+        """
+        # Mapping des transformations Shift
+        shift_map = {
+            '1': '!', '2': '@', '3': '#', '4': '$', '5': '%',
+            '6': '^', '7': '&', '8': '*', '9': '(', '0': ')',
+            '-': '_', '=': '+', '[': '{', ']': '}',
+            ';': ':', "'": '"', ',': '<', '.': '>', '/': '?'
+        }
+        
+        # Si c'est une lettre, mettre en majuscule
+        if char.isalpha():
+            return char.upper()
+        # Si c'est dans le mapping, retourner le symbole
+        elif char in shift_map:
+            return shift_map[char]
+        else:
+            return char
     
     def draw(self, screen: pygame.Surface, theme: dict, font: pygame.font.Font):
         """
@@ -264,8 +368,60 @@ class VirtualKeyboard:
             theme: Thème de couleurs
             font: Police pour les touches
         """
+        # Dessiner les zones intelligentes si activées
+        if config.ENABLE_SMART_ZONES:
+            self._draw_smart_zones(screen, theme)
+        
         for key in self.keys:
             key.draw(screen, theme, font)
+    
+    def _draw_smart_zones(self, screen: pygame.Surface, theme: dict):
+        """
+        Dessine les zones intelligentes (gauche/droite)
+        
+        Args:
+            screen: Surface Pygame
+            theme: Thème de couleurs
+        """
+        if not self.keys:
+            return
+        
+        # Trouver les limites du clavier
+        min_x = min(k.x for k in self.keys)
+        max_x = max(k.x + k.w for k in self.keys)
+        min_y = min(k.y for k in self.keys)
+        max_y = max(k.y + k.h for k in self.keys)
+        
+        # Point milieu
+        mid_x = (min_x + max_x) // 2
+        
+        # Zone gauche (bleutée)
+        left_zone_width = mid_x - min_x
+        left_zone_height = max_y - min_y
+        
+        left_surface = pygame.Surface((left_zone_width, left_zone_height), pygame.SRCALPHA)
+        left_color = theme['cursor']
+        # Ensure we only use RGB for tint calculation if cursor becomes RGBA
+        left_color_rgb = left_color[:3]
+        left_tint = tuple(min(255, max(0, c + offset)) 
+                         for c, offset in zip(left_color_rgb, config.LEFT_ZONE_COLOR_TINT))
+        left_tint_alpha = left_tint + (int(255 * config.ZONE_OPACITY),)
+        left_surface.fill(left_tint_alpha)
+        screen.blit(left_surface, (min_x, min_y))
+        
+        # Zone droite (orangée)
+        right_zone_width = max_x - mid_x
+        right_zone_height = max_y - min_y
+        
+        right_surface = pygame.Surface((right_zone_width, right_zone_height), pygame.SRCALPHA)
+        right_color = theme['cursor']
+        # Ensure we only use RGB for tint calculation
+        right_color_rgb = right_color[:3]
+        right_tint = tuple(min(255, max(0, c + offset)) 
+                          for c, offset in zip(right_color_rgb, config.RIGHT_ZONE_COLOR_TINT))
+        right_tint_alpha = right_tint + (int(255 * config.ZONE_OPACITY),)
+        right_surface.fill(right_tint_alpha)
+        screen.blit(right_surface, (mid_x, min_y))
     
     def get_text(self) -> str:
         """Retourne le texte tapé"""

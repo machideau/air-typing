@@ -22,7 +22,15 @@ from utils import (
     StatusBar,
     Cursor,
     ParticleSystem,
-    AudioManager
+    AudioManager,
+    StatsTracker,
+    GestureRecognizer
+)
+from utils.ui_components import (
+    StatsDisplay,
+    TrailEffect,
+    ComboIndicator,
+    EnergyWaveSystem
 )
 
 
@@ -51,6 +59,14 @@ class AirTypingApp:
         self.cursor = Cursor()
         self.particle_system = ParticleSystem()
         self.audio_manager = AudioManager()
+        
+        # Nouveaux composants
+        self.stats_tracker = StatsTracker()
+        self.gesture_recognizer = GestureRecognizer()
+        self.stats_display = StatsDisplay()
+        self.trail_effect = TrailEffect()
+        self.combo_indicator = ComboIndicator()
+        self.energy_waves = EnergyWaveSystem()
         
         # Initialiser la webcam
         self.cap = cv2.VideoCapture(config.CAMERA_INDEX)
@@ -146,6 +162,21 @@ class AirTypingApp:
                     new_layout = 'AZERTY' if current_layout == 'QWERTY' else 'QWERTY'
                     self.keyboard.change_layout(new_layout)
                     print(f"Layout changé: {new_layout}")
+                
+                elif event.key == pygame.K_r:
+                    # Réinitialiser les stats
+                    self.stats_tracker.reset_session()
+                    print("Statistiques réinitialisées")
+                
+                elif event.key == pygame.K_z:
+                    # Toggle zones intelligentes
+                    config.ENABLE_SMART_ZONES = not config.ENABLE_SMART_ZONES
+                    print(f"Zones intelligentes: {'Activées' if config.ENABLE_SMART_ZONES else 'Désactivées'}")
+                
+                elif event.key == pygame.K_g:
+                    # Toggle gestes avancés
+                    config.ENABLE_ADVANCED_GESTURES = not config.ENABLE_ADVANCED_GESTURES
+                    print(f"Gestes avancés: {'Activés' if config.ENABLE_ADVANCED_GESTURES else 'Désactivés'}")
     
     def _process_frame(self):
         """Traite une frame de la webcam"""
@@ -195,6 +226,11 @@ class AirTypingApp:
             timestamp_ms = pygame.time.get_ticks()
             left_hand, right_hand, landmarks = self.hand_detector.detect(frame_rgb, timestamp_ms)
             
+            # Mettre à jour l'historique des gestes
+            if config.ENABLE_ADVANCED_GESTURES:
+                self.gesture_recognizer.update_history(left_hand, right_hand)
+                self._process_gestures(landmarks, left_hand, right_hand)
+            
             # Dessiner le fond
             self._draw_background(frame_rgb)
             
@@ -203,35 +239,70 @@ class AirTypingApp:
                 left_hand['pos'], left_hand['clicking'],
                 right_hand['pos'], right_hand['clicking']
             )
+
+            # DEBUG: Log clicking state occasionally
+            if left_hand['clicking'] or right_hand['clicking']:
+                if timestamp_ms % 30 == 0:  # Avoid spam
+                    print(f"DEBUG: Clicking active! Left: {left_hand['clicking']}, Right: {right_hand['clicking']}")
+            
+            # DEBUG: Log detected char
+            if typed_char:
+                print(f"DEBUG: Typed '{typed_char}'")
+            
+            # Tracker les statistiques
+            if typed_char:
+                self.stats_tracker.track_keystroke(typed_char)
+            
+            # Mettre à jour le combo
+            self.combo_indicator.update(typed_char is not None)
             
             # Jouer le son si une touche a été tapée
             if typed_char:
                 self.audio_manager.play_key_sound(typed_char)
-                # Émettre des particules pour la main qui a tapé
-                # Vérifier quelle main a cliqué
+                
+                # Émettre des particules et ondes d'énergie pour la main qui a tapé
                 if left_hand['clicking'] and left_hand['pos']:
                     self.particle_system.emit(
                         left_hand['pos'][0],
                         left_hand['pos'][1],
                         self.current_theme['particle']
                     )
+                    self.energy_waves.emit(
+                        left_hand['pos'][0],
+                        left_hand['pos'][1],
+                        self.current_theme['key_hover']
+                    )
+                
                 if right_hand['clicking'] and right_hand['pos']:
                     self.particle_system.emit(
                         right_hand['pos'][0],
                         right_hand['pos'][1],
                         self.current_theme['particle']
                     )
+                    self.energy_waves.emit(
+                        right_hand['pos'][0],
+                        right_hand['pos'][1],
+                        self.current_theme['key_hover']
+                    )
             
-            # Dessiner le clavier
+            # Dessiner le clavier (avec zones intelligentes)
             self.keyboard.draw(self.screen, self.current_theme, self.font_normal)
             
+            
             # Dessiner la zone de texte
+            current_text = self.keyboard.get_text()
+            if len(current_text) > 0 and timestamp_ms % 60 == 0:  # Log occasionally
+                print(f"DEBUG: Current text length: {len(current_text)}, last 20 chars: '{current_text[-20:]}'")
             self.text_box.draw(
                 self.screen,
-                self.keyboard.get_text(),
+                current_text,
                 self.current_theme,
                 self.font_big
             )
+            
+            # Mettre à jour et dessiner les traînées
+            self.trail_effect.update(left_hand['pos'], right_hand['pos'])
+            self.trail_effect.draw(self.screen, self.current_theme)
             
             # Dessiner les deux curseurs
             self.cursor.update()
@@ -243,6 +314,17 @@ class AirTypingApp:
             # Mettre à jour et dessiner les particules
             self.particle_system.update()
             self.particle_system.draw(self.screen)
+            
+            # Mettre à jour et dessiner les ondes d'énergie
+            self.energy_waves.update()
+            self.energy_waves.draw(self.screen)
+            
+            # Dessiner le combo
+            self.combo_indicator.draw(self.screen, self.current_theme)
+            
+            # Dessiner les statistiques
+            stats = self.stats_tracker.get_stats_summary()
+            self.stats_display.draw(self.screen, stats, self.current_theme, self.font_small)
             
             # Dessiner la barre d'état
             self.status_bar.update(self.fps, self.current_theme['name'])
@@ -272,6 +354,44 @@ class AirTypingApp:
                 x = int(landmark.x * config.WINDOW_WIDTH)
                 y = int(landmark.y * config.WINDOW_HEIGHT)
                 pygame.draw.circle(self.screen, (0, 255, 0), (x, y), 3)
+    
+    def _process_gestures(self, landmarks_list, left_hand: dict, right_hand: dict):
+        """
+        Traite les gestes avancés
+        
+        Args:
+            landmarks_list: Liste des landmarks
+            left_hand: Données main gauche
+            right_hand: Données main droite
+        """
+        if not landmarks_list:
+            return
+        
+        # Vérifier peace sign (index + majeur levés = effacer tout)
+        for hand_lms in landmarks_list:
+            if self.gesture_recognizer.detect_peace_sign(hand_lms):
+                if self.gesture_recognizer.can_trigger_gesture('peace_sign'):
+                    self.keyboard.clear_text()
+                    print("Geste: Peace sign (✌️) - Texte effacé")
+                    break
+            
+            # Vérifier pouce levé (sauvegarder)
+            if self.gesture_recognizer.detect_thumbs_up(hand_lms):
+                if self.gesture_recognizer.can_trigger_gesture('thumbs_up'):
+                    self._save_text()
+                    print("Geste: Pouce levé - Texte sauvegardé")
+                    break
+        
+        # Vérifier swipe (changer thème)
+        swipe = self.gesture_recognizer.detect_swipe_horizontal('right')
+        if swipe and self.gesture_recognizer.can_trigger_gesture('swipe'):
+            self._cycle_theme()
+            print(f"Geste: Swipe {swipe} - Thème changé")
+        
+        # Vérifier mains jointes (pause - pour l'instant juste un message)
+        if self.gesture_recognizer.detect_hands_together(left_hand, right_hand):
+            if self.gesture_recognizer.can_trigger_gesture('hands_together'):
+                print("Geste: Mains jointes - Mode pause")
     
     def cleanup(self):
         """Nettoie les ressources"""
