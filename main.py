@@ -191,24 +191,34 @@ class AirTypingApp:
             if frame_rgb is None:
                 break
             
-            # Détecter les mains
+            # Détecter les deux mains
             timestamp_ms = pygame.time.get_ticks()
-            cursor_pos, clicking, landmarks = self.hand_detector.detect(frame_rgb, timestamp_ms)
+            left_hand, right_hand, landmarks = self.hand_detector.detect(frame_rgb, timestamp_ms)
             
             # Dessiner le fond
             self._draw_background(frame_rgb)
             
-            # Mettre à jour le clavier
-            typed_char = self.keyboard.update(cursor_pos, clicking)
+            # Mettre à jour le clavier avec les deux mains
+            typed_char = self.keyboard.update(
+                left_hand['pos'], left_hand['clicking'],
+                right_hand['pos'], right_hand['clicking']
+            )
             
             # Jouer le son si une touche a été tapée
             if typed_char:
                 self.audio_manager.play_key_sound(typed_char)
-                # Émettre des particules
-                if cursor_pos:
+                # Émettre des particules pour la main qui a tapé
+                # Vérifier quelle main a cliqué
+                if left_hand['clicking'] and left_hand['pos']:
                     self.particle_system.emit(
-                        cursor_pos[0],
-                        cursor_pos[1],
+                        left_hand['pos'][0],
+                        left_hand['pos'][1],
+                        self.current_theme['particle']
+                    )
+                if right_hand['clicking'] and right_hand['pos']:
+                    self.particle_system.emit(
+                        right_hand['pos'][0],
+                        right_hand['pos'][1],
                         self.current_theme['particle']
                     )
             
@@ -223,10 +233,12 @@ class AirTypingApp:
                 self.font_big
             )
             
-            # Dessiner le curseur
-            if cursor_pos:
-                self.cursor.update()
-                self.cursor.draw(self.screen, cursor_pos, self.current_theme, clicking)
+            # Dessiner les deux curseurs
+            self.cursor.update()
+            if left_hand['detected'] and left_hand['pos']:
+                self.cursor.draw_left(self.screen, left_hand['pos'], self.current_theme, left_hand['clicking'])
+            if right_hand['detected'] and right_hand['pos']:
+                self.cursor.draw_right(self.screen, right_hand['pos'], self.current_theme, right_hand['clicking'])
             
             # Mettre à jour et dessiner les particules
             self.particle_system.update()

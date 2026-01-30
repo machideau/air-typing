@@ -230,7 +230,19 @@ class Cursor:
     
     def draw(self, screen: pygame.Surface, pos: Tuple[int, int], theme: dict, clicking: bool = False):
         """
-        Dessine le curseur
+        Dessine le curseur (version par défaut - main droite)
+        
+        Args:
+            screen: Surface Pygame
+            pos: Position (x, y)
+            theme: Thème de couleurs
+            clicking: True si en train de cliquer
+        """
+        self.draw_right(screen, pos, theme, clicking)
+    
+    def draw_left(self, screen: pygame.Surface, pos: Tuple[int, int], theme: dict, clicking: bool = False):
+        """
+        Dessine le curseur de la main gauche
         
         Args:
             screen: Surface Pygame
@@ -239,8 +251,41 @@ class Cursor:
             clicking: True si en train de cliquer
         """
         x, y = pos
-        color = theme['cursor']
+        # Couleur légèrement modifiée pour la main gauche (plus bleutée)
+        base_color = theme['cursor']
+        color = tuple(min(255, max(0, c + offset)) for c, offset in zip(base_color, (-20, -10, 20)))
         
+        self._draw_cursor_shape(screen, x, y, color, clicking, "L")
+    
+    def draw_right(self, screen: pygame.Surface, pos: Tuple[int, int], theme: dict, clicking: bool = False):
+        """
+        Dessine le curseur de la main droite
+        
+        Args:
+            screen: Surface Pygame
+            pos: Position (x, y)
+            theme: Thème de couleurs
+            clicking: True si en train de cliquer
+        """
+        x, y = pos
+        # Couleur légèrement modifiée pour la main droite (plus orangée)
+        base_color = theme['cursor']
+        color = tuple(min(255, max(0, c + offset)) for c, offset in zip(base_color, (20, 10, -20)))
+        
+        self._draw_cursor_shape(screen, x, y, color, clicking, "R")
+    
+    def _draw_cursor_shape(self, screen: pygame.Surface, x: int, y: int, color: Tuple[int, int, int], 
+                          clicking: bool, label: str):
+        """
+        Dessine la forme du curseur
+        
+        Args:
+            screen: Surface Pygame
+            x, y: Position
+            color: Couleur du curseur
+            clicking: True si en train de cliquer
+            label: Label à afficher (L ou R)
+        """
         # Rayon avec pulsation
         pulse_offset = int(math.sin(self.pulse) * 3)
         outer_radius = config.CURSOR_OUTER_RADIUS + pulse_offset
@@ -262,3 +307,9 @@ class Cursor:
         pygame.draw.line(screen, color, (x + 5, y), (x + line_length, y), 1)
         pygame.draw.line(screen, color, (x, y - line_length), (x, y - 5), 1)
         pygame.draw.line(screen, color, (x, y + 5), (x, y + line_length), 1)
+        
+        # Label pour identifier la main
+        font = pygame.font.Font(None, 20)
+        label_surface = font.render(label, True, color)
+        label_rect = label_surface.get_rect(center=(x, y - outer_radius - 10))
+        screen.blit(label_surface, label_rect)

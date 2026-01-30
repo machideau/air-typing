@@ -34,11 +34,12 @@ class HandDetector:
         
         self.landmarker = self.HandLandmarker.create_from_options(options)
         
-        # Smoothing pour le curseur
-        self.prev_cursor_pos = None
+        # Smoothing pour les deux curseurs
+        self.prev_left_pos = None
+        self.prev_right_pos = None
         self.smoothing = config.HOVER_SMOOTHING
         
-    def detect(self, frame: np.ndarray, timestamp_ms: int) -> Tuple[Optional[Tuple[int, int]], bool, List]:
+    def detect(self, frame: np.ndarray, timestamp_ms: int) -> Tuple[dict, dict, List]:
         """
         Détecte les mains dans une frame
         
@@ -48,8 +49,8 @@ class HandDetector:
             
         Returns:
             Tuple contenant:
-            - Position du curseur (x, y) ou None
-            - État du clic (True/False)
+            - Données main gauche: {'pos': (x,y), 'clicking': bool, 'detected': bool}
+            - Données main droite: {'pos': (x,y), 'clicking': bool, 'detected': bool}
             - Liste des landmarks pour le debug
         """
         # Convert to MediaPipe Image
@@ -58,11 +59,15 @@ class HandDetector:
         # Process
         results = self.landmarker.detect_for_video(mp_image, timestamp_ms)
         
-        cursor_pos = None
-        clicking = False
+        # Initialiser les données des mains
+        left_hand = {'pos': None, 'clicking': False, 'detected': False}
+        right_hand = {'pos': None, 'clicking': False, 'detected': False}
         all_landmarks = []
         
         if results.hand_landmarks:
+            # Collecter toutes les mains détectées avec leurs positions
+            hands_data = []
+            
             for hand_lms in results.hand_landmarks:
                 all_landmarks.append(hand_lms)
                 
@@ -70,29 +75,67 @@ class HandDetector:
                 idx_x = int(hand_lms[8].x * config.WINDOW_WIDTH)
                 idx_y = int(hand_lms[8].y * config.WINDOW_HEIGHT)
                 
-                # Appliquer le lissage
-                if self.prev_cursor_pos is not None:
-                    idx_x = int(self.smoothing * self.prev_cursor_pos[0] + (1 - self.smoothing) * idx_x)
-                    idx_y = int(self.smoothing * self.prev_cursor_pos[1] + (1 - self.smoothing) * idx_y)
-                
-                cursor_pos = (idx_x, idx_y)
-                self.prev_cursor_pos = cursor_pos
-                
                 # Détecter le pincement
                 thumb_x = int(hand_lms[4].x * config.WINDOW_WIDTH)
                 thumb_y = int(hand_lms[4].y * config.WINDOW_HEIGHT)
                 distance = math.hypot(idx_x - thumb_x, idx_y - thumb_y)
+                clicking = distance < config.PINCH_THRESHOLD
                 
-                if distance < config.PINCH_THRESHOLD:
-                    clicking = True
+                hands_data.append({
+                    'pos': (idx_x, idx_y),
+                    'clicking': clicking,
+                    'center_x': idx_x  # Pour déterminer gauche/droite
+                })
+            
+            # Trier par position X pour identifier gauche/droite
+            hands_data.sort(key=lambda h: h['center_x'])
+            
+            # Assigner les mains (la plus à gauche = main gauche, la plus à droite = main droite)
+            if len(hands_data) >= 1:
+                # Au moins une main détectée - on l'assigne à droite par défaut
+                hand_data = hands_data[0]
+                pos = hand_data['pos']
+                
+                # Appliquer le lissage pour la première main (ou main unique)
+                if len(hands_data) == 1:
+                    # Une seule main - utiliser le lissage de droite
+                    if self.prev_right_pos is not None:
+                        pos = (
+                            int(self.smoothing * self.prev_right_pos[0] + (1 - self.smoothing) * pos[0]),
+                            int(self.smoothing * self.prev_right_pos[1] + (1 - self.smoothing) * pos[1])
+                        )
+                    right_hand = {'pos': pos, 'clicking': hand_data['clicking'], 'detected': True}
+                    self.prev_right_pos = pos
+                    self.prev_left_pos = None
+                else:
+                    # Deux mains détectées
+                    # Main gauche (index 0)
+                    left_data = hands_data[0]
+                    left_pos = left_data['pos']
+                    if self.prev_left_pos is not None:
+                        left_pos = (
+                            int(self.smoothing * self.prev_left_pos[0] + (1 - self.smoothing) * left_pos[0]),
+                            int(self.smoothing * self.prev_left_pos[1] + (1 - self.smoothing) * left_pos[1])
+                        )
+                    left_hand = {'pos': left_pos, 'clicking': left_data['clicking'], 'detected': True}
+                    self.prev_left_pos = left_pos
                     
-                # On prend seulement la première main pour le curseur
-                break
+                    # Main droite (index 1)
+                    right_data = hands_data[1]
+                    right_pos = right_data['pos']
+                    if self.prev_right_pos is not None:
+                        right_pos = (
+                            int(self.smoothing * self.prev_right_pos[0] + (1 - self.smoothing) * right_pos[0]),
+                            int(self.smoothing * self.prev_right_pos[1] + (1 - self.smoothing) * right_pos[1])
+                        )
+                    right_hand = {'pos': right_pos, 'clicking': right_data['clicking'], 'detected': True}
+                    self.prev_right_pos = right_pos
         else:
             # Réinitialiser le lissage si aucune main détectée
-            self.prev_cursor_pos = None
+            self.prev_left_pos = None
+            self.prev_right_pos = None
         
-        return cursor_pos, clicking, all_landmarks
+        return left_hand, right_hand, all_landmarks
     
     def get_finger_position(self, hand_landmarks, finger_tip_index: int) -> Tuple[int, int]:
         """

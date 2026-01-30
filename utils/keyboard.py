@@ -146,7 +146,9 @@ class VirtualKeyboard:
         self.layout_name = layout_name or config.DEFAULT_LAYOUT
         self.keys: List[Key] = []
         self.typed_text = ""
-        self.last_clicked_char = ""
+        # Tracking séparé pour chaque main
+        self.last_clicked_char_left = ""
+        self.last_clicked_char_right = ""
         
         # Créer les touches
         self._create_keys()
@@ -178,40 +180,80 @@ class VirtualKeyboard:
                 # Ajouter la largeur de la touche actuelle + un petit espacement
                 current_x += w + 10  # 10 pixels d'espacement entre les touches
     
-    def update(self, cursor_pos: Optional[Tuple[int, int]], clicking: bool) -> Optional[str]:
+    def update(self, cursor_pos_left: Optional[Tuple[int, int]], clicking_left: bool,
+               cursor_pos_right: Optional[Tuple[int, int]], clicking_right: bool) -> Optional[str]:
         """
-        Met à jour le clavier
+        Met à jour le clavier avec deux curseurs
         
         Args:
-            cursor_pos: Position du curseur
-            clicking: État du clic
+            cursor_pos_left: Position du curseur main gauche
+            clicking_left: État du clic main gauche
+            cursor_pos_right: Position du curseur main droite
+            clicking_right: État du clic main droite
+            
+        Returns:
+            Caractère tapé ou None (peut être plusieurs si clics simultanés)
+        """
+        typed_chars = []
+        
+        # Traiter chaque main séparément
+        for key in self.keys:
+            # Main gauche
+            if key.update(cursor_pos_left, clicking_left):
+                if key.char != self.last_clicked_char_left or not clicking_left:
+                    char = self._process_key_press(key)
+                    if char:
+                        typed_chars.append(char)
+                    self.last_clicked_char_left = key.char
+            
+            # Main droite (réinitialiser l'état hover/pressed pour la deuxième vérification)
+            # Sauvegarder l'état actuel
+            saved_hover = key.is_hovered
+            saved_pressed = key.is_pressed
+            
+            if key.update(cursor_pos_right, clicking_right):
+                # Vérifier que ce n'est pas la même touche que la main gauche
+                if key.char != self.last_clicked_char_right or not clicking_right:
+                    # Éviter de taper deux fois si les deux mains sont sur la même touche
+                    if key.char != self.last_clicked_char_left or not clicking_left:
+                        char = self._process_key_press(key)
+                        if char:
+                            typed_chars.append(char)
+                    self.last_clicked_char_right = key.char
+            
+            # Combiner les états hover/pressed des deux mains pour l'affichage
+            key.is_hovered = saved_hover or key.is_hovered
+            key.is_pressed = saved_pressed or key.is_pressed
+        
+        # Réinitialiser le tracking si on ne clique plus
+        if not clicking_left:
+            self.last_clicked_char_left = ""
+        if not clicking_right:
+            self.last_clicked_char_right = ""
+        
+        # Retourner le premier caractère tapé (ou None)
+        return typed_chars[0] if typed_chars else None
+    
+    def _process_key_press(self, key: Key) -> Optional[str]:
+        """
+        Traite l'appui sur une touche
+        
+        Args:
+            key: Touche pressée
             
         Returns:
             Caractère tapé ou None
         """
-        typed_char = None
-        
-        for key in self.keys:
-            if key.update(cursor_pos, clicking):
-                # La touche a été cliquée
-                if key.char != self.last_clicked_char or not clicking:
-                    if key.char == "<-":
-                        # Backspace
-                        if self.typed_text:
-                            self.typed_text = self.typed_text[:-1]
-                            typed_char = "<-"
-                    else:
-                        # Caractère normal
-                        self.typed_text += key.char
-                        typed_char = key.char
-                    
-                    self.last_clicked_char = key.char
-        
-        # Réinitialiser le dernier caractère si on ne clique plus
-        if not clicking:
-            self.last_clicked_char = ""
-        
-        return typed_char
+        if key.char == "<-":
+            # Backspace
+            if self.typed_text:
+                self.typed_text = self.typed_text[:-1]
+                return "<-"
+        else:
+            # Caractère normal
+            self.typed_text += key.char
+            return key.char
+        return None
     
     def draw(self, screen: pygame.Surface, theme: dict, font: pygame.font.Font):
         """
