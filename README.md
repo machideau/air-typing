@@ -1,59 +1,191 @@
-# ⌨️ Air-Typing Keyboard (AI-Powered Virtual UI)
+# ⌨️ Air-Typing - Clavier Virtuel Contrôlé par Gestes
 
-A futuristic, gesture-controlled virtual keyboard built with **Computer Vision**. This project allows users to type in mid-air by tracking hand movements and finger "clicks" (pinch gestures) using a webcam. 
-
-Designed for high engagement on platforms like **TikTok and Instagram**, featuring a "holographic" HUD and real-time interactive feedback.
+Un clavier virtuel futuriste contrôlé par gestes, construit avec **Computer Vision**. Ce projet permet de taper dans les airs en suivant les mouvements de la main et les "clics" des doigts (gestes de pincement) à l'aide d'une webcam.
 
 
+## ✨ Fonctionnalités
 
-## ✨ Features
-* **Real-time Hand Tracking:** Uses MediaPipe to track 21 hand landmarks at high FPS.
-* **Gesture Recognition:** Intelligent "Pinch-to-Click" detection by calculating Euclidean distance between the index finger and thumb.
-* **Holographic UI:** A semi-transparent Pygame overlay that creates an Augmented Reality (AR) effect.
-* **Full Keyboard Logic:** Includes A-Z, Spacebar, and a functional Backspace system.
-* **Visual Feedback:** Dynamic color shifting (Cyan for hover, Magenta for click) to provide UX feedback.
+* **Suivi des Mains en Temps Réel** : Utilise MediaPipe pour suivre 21 points de repère de la main à haute fréquence
+* **Reconnaissance de Gestes** : Détection intelligente du "pincement" en calculant la distance euclidienne entre l'index et le pouce
+* **Interface Holographique** : Overlay Pygame semi-transparent créant un effet de Réalité Augmentée (AR)
+* **Clavier Complet** : Inclut A-Z, barre d'espace, et système de suppression (Backspace) fonctionnel
+* **Retour Visuel Dynamique** : Changement de couleur (Cyan au survol, Magenta au clic) pour un feedback UX immersif
 
-## 🚀 Tech Stack
+---
 
-| Technology | Purpose |
-| :--- | :--- |
-| ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54) | **Python 3.11** - Core Logic |
-| ![OpenCV](https://img.shields.io/badge/opencv-%23white.svg?style=for-the-badge&logo=opencv&logoColor=white) | **OpenCV 4.10.0** - Image Processing |
-| ![MediaPipe](https://img.shields.io/badge/MediaPipe-007f7b?style=for-the-badge&logo=google&logoColor=white) | **MediaPipe 0.10.1** - Hand Landmark Tracking |
-| ![Pygame](https://img.shields.io/badge/Pygame-33cc33?style=for-the-badge&logo=python&logoColor=white) | **Pygame** - Virtual UI and Rendering |
-| ![NumPy](https://img.shields.io/badge/numpy-%23013243.svg?style=for-the-badge&logo=numpy&logoColor=white) | **NumPy 1.26.4** - Matrix Calculations |
+## 🚀 Technologies Utilisées
 
-## 📦 Installation
+| Technologie | Version | Utilisation |
+|------------|---------|-------------|
+| **Python** | 3.11+ | Langage principal |
+| **OpenCV** | 4.10.0.84 | Traitement d'image et capture webcam |
+| **MediaPipe** | 0.10.14 | Détection et suivi des points de la main |
+| **Pygame-CE** | Latest | Interface graphique et rendu |
+| **NumPy** | Latest | Calculs matriciels |
+| **Protobuf** | <5.0.0 | Sérialisation des données MediaPipe |
 
-1. **Clone the repository:**
-   ```bash
-   git clone [https://github.com/jemelimercy/air-typing-keyboard.git](https://github.com/jemelimercy/Air-Typing-Keyboard.git)
-   cd Air-Typing-Keyboard
+---
 
-2. Set up a Virtual Environment (Recommended):
-    py -3.11 -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# Mac/Linux:
-source .venv/bin/activate
+## 📦 Installation et Configuration
 
-3. Install Dependencies:
-pip install opencv-python==4.10.0.84 mediapipe==0.10.14 numpy==1.26.4 pygame
+### Prérequis
 
-🎮 How to Use
-Run the script: python main.py
+- **Python 3.11** ou supérieur
+- **Webcam** fonctionnelle
+- **Windows** (testé sur Windows, adaptable pour Mac/Linux)
+- **Fichier modèle MediaPipe** : `hand_landmarker.task` (doit être dans le même dossier que `main.py`)
 
-Position your hand so the webcam can see your palm.
+### Étapes d'Installation
 
-Move: Use your Index Finger Tip as the mouse cursor to hover over keys.
+#### 1️⃣ Cloner le dépôt
 
-Type: Bring your Thumb and Index Finger together (pinch) to "click" a key.
+```bash
+git clone https://github.com/machideau/air-typing.git
+cd air-typing
+```
 
-Delete: Use the BS (Backspace) key at the top right to fix typos.
+#### 2️⃣ Créer un environnement virtuel (Recommandé)
 
-🛠 Project Structure
-main.py: The core application containing the Pygame loop and MediaPipe logic.
+**Windows :**
+```bash
+py -3.11 -m venv env
+env\Scripts\activate
+```
 
-.gitignore: Prevents environment files and cache from being uploaded.
+**Mac/Linux :**
+```bash
+python3.11 -m venv env
+source env/bin/activate
+```
 
-assets/: (Optional) Folder for click sounds or custom fonts.
+#### 3️⃣ Installer les dépendances
+
+```bash
+pip install -r requirements.txt
+```
+
+**Ou manuellement :**
+```bash
+pip install opencv-python==4.10.0.84 mediapipe==0.10.14 numpy protobuf<5.0.0 pygame-ce pygame msvc-runtime
+```
+
+#### 4️⃣ Télécharger le modèle MediaPipe
+
+Le fichier `hand_landmarker.task` doit être présent dans le répertoire racine du projet. Si vous ne l'avez pas, téléchargez-le depuis :
+
+🔗 [MediaPipe Hand Landmarker Model](https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task)
+
+Placez-le dans le dossier `air-typing/` à côté de `main.py`.
+
+---
+
+## 🎮 Utilisation
+
+### Lancer l'Application
+
+```bash
+python main.py
+```
+
+### Comment Utiliser le Clavier Virtuel
+
+1. **Positionnement** : Placez votre main devant la webcam, paume visible
+2. **Déplacer le Curseur** : Utilisez la pointe de votre **index** comme curseur pour survoler les touches
+3. **Taper une Lettre** : Rapprochez votre **pouce** et votre **index** (geste de pincement) pour "cliquer" sur une touche
+4. **Effacer** : Utilisez la touche **BS** (Backspace) en haut à droite pour supprimer des caractères
+5. **Espace** : La touche **SPACE** en bas permet d'ajouter des espaces
+
+### Indicateurs Visuels
+
+- **Cercle Cyan** : Curseur de votre index
+- **Contour Cyan** : Touche survolée
+- **Contour Magenta** : Touche cliquée
+- **Zone de Texte** : Affiche le texte tapé en temps réel
+
+---
+
+## 🛠 Structure du Projet
+
+```
+air-typing/
+├── main.py                  # Application principale (boucle Pygame + logique MediaPipe)
+├── hand_landmarker.task     # Modèle MediaPipe pour la détection des mains
+├── requirements.txt         # Dépendances Python
+├── .gitignore              # Fichiers à ignorer par Git
+├── README.md               # Ce fichier
+└── debug_*.py              # Scripts de débogage (optionnels)
+```
+
+---
+
+## 🐛 Dépannage
+
+### Problème : `ImportError: DLL load failed while importing _framework_bindings`
+
+**Solution :**
+```bash
+pip uninstall mediapipe
+pip install mediapipe==0.10.14
+```
+
+### Problème : La webcam ne s'ouvre pas
+
+**Solution :**
+- Vérifiez que votre webcam est connectée et fonctionnelle
+- Essayez de changer l'index de la caméra dans `main.py` :
+  ```python
+  cap = cv2.VideoCapture(1)  # Essayez 0, 1, 2...
+  ```
+
+### Problème : `FileNotFoundError: hand_landmarker.task`
+
+**Solution :**
+- Téléchargez le modèle depuis le lien ci-dessus
+- Placez-le dans le même dossier que `main.py`
+
+### Problème : Détection des gestes imprécise
+
+**Solution :**
+- Améliorez l'éclairage de votre environnement
+- Ajustez la distance entre votre main et la webcam
+- Modifiez le seuil de détection dans `main.py` (ligne 119) :
+  ```python
+  if distance < 40:  # Augmentez ou diminuez cette valeur
+  ```
+
+---
+
+## 📝 Améliorations Futures
+
+- [ ] Ajout de sons de clic pour le feedback audio
+- [ ] Support de plusieurs langues (AZERTY, QWERTZ)
+- [ ] Mode sombre / clair
+- [ ] Enregistrement automatique du texte tapé
+- [ ] Détection de gestes supplémentaires (swipe pour effacer tout, etc.)
+- [ ] Optimisation des performances pour des FPS plus élevés
+
+---
+
+## 📄 Licence
+
+Ce projet est open source. Libre d'utilisation pour des projets personnels et éducatifs.
+
+---
+
+## 👤 Auteur
+
+**machideau**
+- GitHub: [@machideau](https://github.com/machideau)
+- Projet: [air-typing](https://github.com/machideau/air-typing)
+
+---
+
+## 🙏 Remerciements
+
+- **MediaPipe** par Google pour la technologie de suivi des mains
+- **OpenCV** pour le traitement d'image
+- **Pygame Community Edition** pour le rendu graphique
+
+---
+
+**⭐ Si ce projet vous plaît, n'hésitez pas à lui donner une étoile sur GitHub !**
